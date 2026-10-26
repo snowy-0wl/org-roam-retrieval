@@ -148,3 +148,8 @@ Direct Lisp calls and stale keybindings still receive explicit runtime errors.
 Results use =variable-pitch= body text and the active Org document/heading faces.
 Only paths use smaller fixed-pitch metadata. The configured reading width and
 line spacing match Org notes; result line numbers and mouse hover styling are off.
+
+* Reference and design
+
+See the [[file:org-roam-retrieval-contracts.org][retrieval contracts]] for process, session, source-safety, coverage,
+and navigation guarantees, and the [[file:org-roam-retrieval-design.org][design explanation]] for their rationale.

@@ -1,0 +1,103 @@
+#+TITLE: Why retrieval belongs in Org-roam with a managed worker
+
+Org-roam retrieval combines two jobs with different constraints. Emacs must
+preserve the meaning of a live note, cursor, and authored node ID. Extraction
+and model inference must process a library without delaying the command loop.
+The [[file:org-roam-retrieval-contracts.org][contract reference]] describes observable guarantees. The [[file:org-roam-retrieval.org][user guide]]
+explains commands, and the [[file:../python/README.md][worker README]] describes its environment.
+
+* One interaction owned by Org-roam
+
+The extension owns related-note snapshots, library queries, result sessions,
+and link insertion. Both search modes therefore use the same source identities
+and navigation rules. Existing Vdeft and org-similarity commands remain aliases
+without loading those packages. This avoids separate command behavior and
+index lifecycles for library search and related-note discovery.
+
+Live snapshots come from buffers because the graph database cannot represent
+unsaved edits. Saved corpus extraction uses Org's parser in a clean subprocess
+because heading identities and Org syntax need their native interpretation.
+These paths share prose extraction but keep their state separate. A query can
+use unsaved text without publishing it to the saved corpus or saving the note.
+
+This separation appears in =org-roam-retrieval--snapshot= and the aliases in
+[[file:../extensions/org-roam-retrieval.el][org-roam-retrieval.el]], and in
+[[file:../extensions/org-roam-retrieval-extract.el][org-roam-retrieval-extract-file]].
+
+* A persistent model outside the editor
+
+A persistent Python worker retains one lazy model and an in-memory native
+matrix across requests. NumPy scores normalized float32 vectors directly.
+SQLite stores derived passages and content-addressed embeddings separately
+from the graph, so reconciliation and retrieval repair do not rebuild graph
+identity. The editor exchanges requests and passages rather than Lisp vector
+objects.
+
+One scheduler owns mutable index state. Extraction and model executors return
+completions to that owner. Revision checks prevent extraction from committing
+under the wrong saved-file stamp. Content-addressed embedding entries cannot
+restore deleted passages. This gives concurrent background work a defined
+commit boundary without letting inference own source files.
+
+The managed, locked environment keeps the Python dependencies reproducible.
+Offline loading pins an immutable EmbeddingGemma 2 revision. Profile identity
+also includes task policy and numeric representation because vectors from
+different policies are not interchangeable. Query formatting uses =SearchQuery=.
+Prepared corpus inputs carry bounded title/body text. Related notes use that
+same search contract, so the result is directional retrieval rather than a
+claim of symmetric passage similarity.
+
+The implementation is in [[file:../python/org_roam_retrieval/worker.py][Service]], [[file:../python/org_roam_retrieval/store.py][Store]],
+[[file:../python/org_roam_retrieval/embedding.py][Profile and SentenceTransformerEncoder]], and
+[[file:../python/org_roam_retrieval/extract.py][prepare_chunks]].
+
+* Useful results before the model finishes
+
+Lexical retrieval can answer from committed passages while model loading,
+OCR, and background embedding continue. Hybrid refinement combines ranks
+with reciprocal rank fusion because BM25 and cosine scores have different
+scales. Grouping before candidate limits keeps a long book's overlapping
+passages from occupying every candidate slot.
+
+The interface keeps existing results during refresh and failure. Semantic
+updates replace the response within the same session and preserve a selected
+result by ID. Coalesced coverage refreshes use a fixed timer, so continued OCR
+progress cannot postpone every update. Background events do not reopen
+windows or move focus. Together these choices let the reader use a result
+while coverage improves.
+
+Explicit link insertion follows a marker because the user chooses a result
+at insertion time. Automatic whole-list insertion requires unchanged source
+text because its choice was made from an earlier snapshot. A hidden insertion
+session also preserves an existing library search.
+
+These choices are covered by the slow-model/extractor and grouping tests in
+[[file:../python/tests/test_worker.py][test_worker.py]], and by the refresh, selection, source-edit,
+and quiet-insertion tests in [[file:../tests/test-org-roam-retrieval-ui.el][test-org-roam-retrieval-ui.el]].
+
+* Searchable representations with traceable locations
+
+Extraction converts authored formats to text while retaining locations the
+source can support. HTML drops executable/navigation noise. EPUB follows its
+real reading-order spine. Org removes drawers and code blocks but retains
+original formula source. LaTeX remains inert source text. No extractor runs
+TeX, follows includes, evaluates Babel, or invents document pagination.
+These transformations are retrieval views, not rewrites of authored files.
+They do not add a separate Hebrew/Greek linguistic normalization policy.
+
+Generated =org-ltximg= previews duplicate authored formulas and provide worse
+locations than the Org source. Structural filename/build rules exclude those
+previews before OCR while retaining small authored images. Formula content
+stays searchable through the original Org or LaTeX source. OCR adds recognized
+text from images and PDF pages, with explicit partial or filename-only
+coverage when it cannot read them. It does not infer visual meaning.
+
+Per-format extraction versions let reconciliation upgrade representations
+without discarding unchanged embedding inputs. Separate counts for content,
+filename-only sources, failures, and exclusions make coverage interpretable.
+A finished embedding fraction describes eligible content, not an unsupported
+claim that every library file has searchable text.
+
+See [[file:../python/docs/coverage-design.md][the extraction coverage design]], [[file:../python/org_roam_retrieval/policy.py][policy.py]],
+[[file:../python/org_roam_retrieval/formats.py][format extractors]], and the source-preservation/migration fixtures in
+[[file:../python/tests/test_coverage.py][test_coverage.py]].

@@ -326,15 +326,20 @@
       (with-current-buffer (org-roam-retrieval-session-buffer session)
         (should (string-match-p "15/40" (buffer-string)))))))
 
-(ert-deftest org-roam-retrieval-ui-opens-a-normal-main-window ()
+(ert-deftest org-roam-retrieval-ui-opens-a-right-window-without-replacing-source ()
   (org-roam-retrieval-test-ui
     (save-window-excursion
       (switch-to-buffer source)
       (let* ((main (selected-window))
+             (other (split-window-below))
+             (other-buffer (window-buffer other))
              (session (with-current-buffer source (org-roam-retrieval-search "galaxy"))))
-        (should (eq main (selected-window)))
-        (should (eq (window-buffer main) (org-roam-retrieval-session-buffer session)))
-        (should-not (window-parameter main 'window-side))
+        (should (eq (window-buffer main) source))
+        (should (window-live-p other))
+        (should (eq (window-buffer other) other-buffer))
+        (should (eq (window-buffer (selected-window))
+                    (org-roam-retrieval-session-buffer session)))
+        (should (eq (window-parameter (selected-window) 'window-side) 'right))
         (with-current-buffer source
           (should (memq #'org-roam-retrieval--source-kill kill-buffer-hook)))))))
 

@@ -153,3 +153,10 @@ See `docs/coverage-design.md` and `tests/test_coverage.py` for the design and
 source-safe migration/format fixtures. Activating this upgrade requires syncing
 the frozen environment, restarting the managed worker, and reconciling normally;
 a destructive repair is not needed.
+
+## Integration contracts
+
+The [contract reference](../doc/org-roam-retrieval-contracts.org) covers the
+Emacs/worker boundary, cancellation, readiness, source safety, locations, and
+cache lifecycle. The [design explanation](../doc/org-roam-retrieval-design.org)
+explains why the editor and managed worker own different responsibilities.

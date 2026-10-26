@@ -1,0 +1,203 @@
+#+TITLE: Org-roam retrieval contracts
+
+This reference describes the integrated extension and its managed worker.
+The [[file:org-roam-retrieval.org][user guide]] covers commands. The [[file:org-roam-retrieval-design.org][design explanation]] covers the reasons
+for these boundaries. The [[file:../python/README.md][worker README]] describes setup and extraction formats.
+
+* Ownership and versions
+
+Org-roam owns commands, live-buffer snapshots, session identity, insertion,
+and navigation. The client owns one persistent worker and its runtime.
+The worker owns saved-source extraction, embeddings, and a separate SQLite
+retrieval index. It never writes source files or =org-roam.db=.
+Requiring the client starts no worker, timer, scan, or download.
+
+The wire format is UTF-8 newline-delimited JSON-RPC 2.0. Standard output
+contains protocol messages. Diagnostics use standard error. Messages are
+bounded to 4 MiB. =initialize= advertises protocol version 1 and database
+schema 2. These are separate from the embedding-profile and extraction-policy
+versions. The Emacs client checks JSON-RPC envelopes but does not negotiate
+or reject the advertised protocol/schema numbers.
+
+=org-roam-retrieval-client-start= initializes once per process. Requests queue
+until initialization succeeds. Client lifecycle states are =stopped=,
+=starting=, =ready=, and =failed=. Client =ready= means the handshake completed,
+not that the model loaded or the corpus finished indexing.
+
+References: [[file:../extensions/org-roam-retrieval-client.el][client lifecycle and framing]],
+[[file:../python/org_roam_retrieval/__init__.py][protocol version]], and [[file:../python/org_roam_retrieval/worker.py][Service.rpc_initialize]].
+
+* Requests, responses, and events
+
+=initialize= receives absolute database and root paths, unique root IDs, the
+embedding profile, OCR configuration, and the Emacs extraction helper.
+It starts reconciliation without waiting for model inference. The implemented
+method validation and response fields live in =Service.rpc_initialize=,
+=Service.rpc_search=, =Service.rpc_status=, =Service.rpc_reconcile=, and
+=Service.rpc_repair= in [[file:../python/org_roam_retrieval/worker.py][worker.py]].
+
+| Method | Observable completion |
+|--------+-----------------------|
+| =search= | An initial result, possibly followed by semantic refinement |
+| =status= | Current readiness, coverage, backlog, errors, and profile |
+| =reconcile= | A queued job ID, followed by progress notifications |
+| =repair= | A dry-run plan by default, or a rebuild job |
+| =cancel= | Cancellation accepted, when sent with a request ID |
+| =shutdown= | Stop accepted, without a guarantee that running inference stops |
+
+The Emacs request API returns an integer ID. Each pending callback completes
+at most once. Its response timeout starts when the request is sent.
+Notifications reach =org-roam-retrieval-client-event-hook= with method and
+parameters. =progress= describes reconciliation stages. =status= describes
+model/embedding changes and failures. =search-update= contains the original
+=request_id= and a complete replacement =result=, rather than a patch.
+
+A hybrid search can return lexical results with =semantic_pending: true=.
+A later =search-update= refines that query. A =semantic= mode request does
+not include initial lexical candidates. Related-note retrieval uses
+=source-as-search-query=, not a symmetric similarity measure. Rankings are
+suggestions, not probabilities or evidence of historical textual dependence.
+
+Search rejects empty text, snapshots over 512,000 UTF-8 bytes, unknown tasks
+or modes, and limits outside 1 through 100. Plain queries become quoted FTS
+terms rather than executable FTS expressions. Root filters and best-passage
+grouping precede each candidate cap. Final results group by authored node ID
+when present, otherwise by source. Related node scope excludes that node in
+the source file. File and region scope exclude the whole source file.
+
+References: [[file:../python/org_roam_retrieval/store.py][Store.lexical_candidates and Store.vector_candidates]];
+[[file:../tests/test-org-roam-retrieval-client.el][client callback, timeout, and notification tests]];
+[[file:../python/tests/test_worker.py][test_invalid_rpc_and_unknown_method and test_root_filter_applies_before_top_candidates]].
+
+* Cancellation and display state
+
+Cancellation discards a queued/local callback and notifies the worker even
+when lexical results already arrived. Running inference may finish. A
+cancelled semantic query does not emit its refinement. Reconciliation-job
+cancellation also suppresses extraction completion commits for that job.
+
+Session identity rejects replaced submissions. The last RPC ID matches
+semantic updates to their session. Closing, replacing, or cancelling a
+pane invalidates its work. Cancellation retains displayed results and
+requires an explicit refresh to resume. Late events do not reopen a pane,
+steal focus, or insert links. Refresh failures retain earlier results.
+Updates preserve the selected result ID when that result remains present.
+
+References: [[file:../extensions/org-roam-retrieval.el][org-roam-retrieval--deliver and org-roam-retrieval--worker-event]],
+[[file:../extensions/org-roam-retrieval-ui.el][session cancellation and rendering]], and
+[[file:../tests/test-org-roam-retrieval-ui.el][org-roam-retrieval-cancelled-query-does-not-auto-resume,
+org-roam-retrieval-ui-worker-error-preserves-existing-results, and related session tests]].
+
+* Source and insertion safety
+
+Saved-source indexing uses isolated extraction. It does not read unsaved
+live buffers, create IDs, evaluate Babel, or save notes. Related queries
+snapshot unsaved source text with precedence region, narrowed buffer,
+nearest authored node, then whole buffer. Query snapshots do not enter the
+saved corpus. Org prose extraction removes metadata and executable blocks,
+retains link descriptions, and keeps original inline/environment LaTeX.
+
+Explicit selected-link insertion uses a marker that follows intervening
+edits. It requires a live, writable source buffer and makes an undoable
+change without saving. Automatic list insertion instead requires an unchanged
+=buffer-chars-modified-tick=, editable Org source, nonempty results, and no
+pending semantic query or reconciliation. It runs in a separate hidden
+session. Completion clears its automatic-append flag, including when insertion
+is skipped, so refresh cannot append the same session's list twice.
+
+References: [[file:../extensions/org-roam-retrieval-extract.el][saved extraction]],
+[[file:../extensions/org-roam-retrieval.el][org-roam-retrieval--snapshot and org-roam-retrieval--append]],
+[[file:../extensions/org-roam-retrieval-ui.el][org-roam-retrieval-ui-insert]], and
+[[file:../tests/test-org-roam-retrieval-ui.el][test cases for source edits, pending lists, quiet insertion, and real IDs]].
+
+* Readiness and coverage
+
+Lexical readiness, semantic readiness, and model loading are separate status
+fields. None proves complete coverage. Model failure leaves lexical search
+available. The state scheduler owns SQLite writes and vector generations.
+Separate single-worker executors handle extraction and inference. Queries
+have priority over the next background embedding batch, without interrupting
+an already running batch.
+
+The embedding fraction is =embedded_chunks / eligible_chunks= for current
+content-extraction policies and the active profile. Filename-only chunks and
+excluded files are outside that denominator. =chunks= still counts all active
+chunks. Unsupported, failed, partial-text, OCR-text, and excluded sources have
+separate diagnostics. =pending_extraction_sources= counts indexed sources with
+outdated extraction policies, not every queued or newly discovered file.
+Backlog and job state provide additional progress information.
+
+OCR retrieves recognized words, not image meaning. Missing tools or language
+packs, empty pages, and extraction failures limit coverage. Unsupported files
+can match filenames without searchable body text. Generated preview/build
+exclusions have a separate ledger and do not delete authored files.
+
+References: [[file:../python/org_roam_retrieval/store.py][Store.coverage]], [[file:../python/org_roam_retrieval/policy.py][classification policies]],
+[[file:../python/docs/coverage-design.md][coverage policy]], [[file:../python/tests/test_coverage.py][coverage and migration fixtures]], and
+[[file:../python/tests/test_worker.py][test_lexical_and_status_do_not_wait_for_slow_model and
+ test_embeddings_start_before_slow_library_extraction_finishes]].
+
+* Locations and navigation limits
+
+Authored Org nodes produce =id:= links. ID-less sections retain heading
+ancestry in =roam-source:= links. Following a missing node or heading reports
+that reconciliation is needed. These links do not repair renamed headings.
+Text locators use one-based source lines where provided. DOCX/ODT locations
+refer to the file, without invented page numbers.
+
+PDFs use =pdf:path::page= links with one-based pages. Legacy encoded
+=roam-source:= PDF links still work. PDF Tools or Doc View supplies page
+navigation. Unsupported viewers report the requested page. No locator
+promises sentence highlighting or page coordinates.
+
+EPUB locators retain archive-member =href=, zero-based spine index, and an
+authored fragment when available. Navigation uses the actual member with
+Nov when supported. Other readers report the section. Spreadsheet results
+open the workbook and report the sheet/range. They do not move to a cell.
+Encoded =roam-source:= links require the extension's registered handler.
+
+References: [[file:../extensions/org-roam-retrieval-ui.el][org-roam-retrieval-ui-open-location and link handlers]],
+[[file:../tests/test-org-roam-retrieval-ui.el][link roundtrip and EPUB tests]], and
+[[file:../tests/test-org-roam-retrieval-pdf.el][org-roam-retrieval-pdf-real-page-three-and-readable-link]].
+
+* Index and cache lifecycle
+
+Startup and idle reconciliation compare saved source revisions and extraction
+policies. Save hooks coalesce invalidations without starting the worker.
+Scans exclude hidden entries and symlinks. The most specific configured root
+owns an overlapping path. Unavailable roots retain cached results marked
+stale. Removing a root from configuration removes its active sources during
+full reconciliation.
+
+Extraction completion checks the file stamp before commit. Deleted sources
+are removed from active results. Changed sources receive stale tags and reconciliation
+when encountered during search. Successful extraction replaces active chunks
+and makes lexical content available before new embeddings finish. A source
+extraction failure removes its old chunks and records an error, while other
+sources continue.
+
+Embedding cache keys combine the profile and the exact prepared input hash.
+The profile includes immutable model revision, task policy, dimension,
+device, precision, and normalization. Changed inputs or profiles do not reuse
+incompatible vectors. Late embedding completion may populate cache entries
+but cannot recreate deleted chunks. The native matrix reloads when the
+committed store generation changes. Invalid dimensions, nonfinite values,
+and zero vectors cause errors rather than silent scoring.
+
+Schema 2 migrates versions 0 and 1. Other schema versions fail initialization.
+Restart retains committed chunks and embeddings and marks interrupted jobs.
+Reconciliation recovers filesystem state. Repair previews its plan and, when
+confirmed in Emacs, rebuilds derived source/chunk state while preserving
+embedding cache, source files, and the Org-roam graph. It resets model-error
+state. Ordinary operation never downloads models or dependencies. Explicit
+setup provisions the frozen environment and may download the pinned model.
+
+A worker exit or malformed output fails pending calls. A subsequent request
+can start a fresh worker. A timeout removes its callback and sends cancel.
+Stopping the client leaves authored files intact.
+
+References: [[file:../python/org_roam_retrieval/store.py][Store.upsert, Store.embed, and Store._load_matrix]],
+[[file:../python/org_roam_retrieval/embedding.py][Profile and validate_vectors]],
+[[file:../python/org_roam_retrieval/worker.py][Service._commit_document, Service.rpc_search, and Service.rpc_repair]],
+[[file:../python/tests/test_worker.py][restart, deletion, numeric-contract, and repair tests]], and
+[[file:../tests/test-org-roam-retrieval-client.el][crash, setup, and save-hook tests]].

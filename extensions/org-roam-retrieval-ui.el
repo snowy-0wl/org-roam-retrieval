@@ -166,16 +166,10 @@ DISPLAY is used only by an explicit user action, never by late callbacks."
   (when (and display (org-roam-retrieval-ui--live-p session))
     (save-current-buffer
       (let* ((buffer (org-roam-retrieval-session-buffer session))
-             (main (if (not (window-parameter (selected-window) 'window-side))
-                       (selected-window)
-                     (cl-find-if (lambda (window)
-                                   (not (window-parameter window 'window-side)))
-                                 (window-list)))))
-        (dolist (window (get-buffer-window-list buffer nil (selected-frame)))
-          (when (window-parameter window 'window-side)
-            (quit-window nil window)))
-        (when (window-live-p main) (select-window main))
-        (pop-to-buffer-same-window buffer)))))
+             (window (display-buffer-in-side-window
+                      buffer '((side . right) (slot . 0) (window-width . 0.4)))))
+        (when (window-live-p window)
+          (select-window window))))))
 
 (defun org-roam-retrieval-ui-update (session response)
   "Apply RESPONSE to SESSION without stealing focus or reopening its window."
