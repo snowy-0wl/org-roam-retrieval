@@ -1,0 +1,98 @@
+{
+  "fixture_kind": "synthetic engineering gate, not user-judged evaluation",
+  "profile": {
+    "model": "google/embeddinggemma-2",
+    "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "dimension": 256,
+    "device": "mps",
+    "policy": "search-query-to-titled-document-v1",
+    "dtype": "float32",
+    "normalization": "unit-after-truncation-v1"
+  },
+  "documents": 8,
+  "queries": 7,
+  "model_load_plus_initial_documents_ms": 6550.386250004522,
+  "uncached_query": {
+    "median_ms": 32.70108399738092,
+    "min_ms": 25.75233300740365,
+    "max_ms": 622.4550000042655,
+    "p95_ms": 622.4550000042655
+  },
+  "warm_cached_query_and_native_scoring": {
+    "median_ms": 0.01258398697245866,
+    "min_ms": 0.012083008186891675,
+    "max_ms": 0.0221250083995983,
+    "p95_ms": 0.019207989680580795
+  },
+  "semantic_recall_at_3": 1.0,
+  "semantic_recall_at_1": 1.0,
+  "lexical_recall_at_3": 0.5714285714285714,
+  "semantic_ndcg_at_3": 1.0,
+  "peak_rss_bytes": 2352119808,
+  "checks": {
+    "finite": true,
+    "dimensions": [
+      8,
+      256
+    ],
+    "max_norm_error": 0.0
+  },
+  "results": [
+    {
+      "query": "space-en",
+      "expected": "space",
+      "semantic_rank": 1,
+      "lexical_rank": null,
+      "top_result": "space",
+      "query_ms": 622.4550000042655
+    },
+    {
+      "query": "bread-en",
+      "expected": "bread",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "bread",
+      "query_ms": 26.429084013216197
+    },
+    {
+      "query": "river-he",
+      "expected": "river",
+      "semantic_rank": 1,
+      "lexical_rank": null,
+      "top_result": "river",
+      "query_ms": 89.50649999314919
+    },
+    {
+      "query": "hebrew-he",
+      "expected": "hebrew",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "hebrew",
+      "query_ms": 25.75233300740365
+    },
+    {
+      "query": "greek-en",
+      "expected": "greek",
+      "semantic_rank": 1,
+      "lexical_rank": null,
+      "top_result": "greek",
+      "query_ms": 31.858708010986447
+    },
+    {
+      "query": "greek-gr",
+      "expected": "greek",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "greek",
+      "query_ms": 196.6989999928046
+    },
+    {
+      "query": "memory-en",
+      "expected": "memory",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "memory",
+      "query_ms": 32.70108399738092
+    }
+  ]
+}

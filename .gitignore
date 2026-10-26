@@ -14,3 +14,8 @@
 /config.mk
 /doc/manual.html
 /.eldev/
+
+# Managed retrieval worker build/runtime outputs
+**/__pycache__/
+*.egg-info/
+/python/.venv/

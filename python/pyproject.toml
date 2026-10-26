@@ -1,0 +1,30 @@
+[project]
+name = "org-roam-retrieval"
+version = "0.1.0"
+description = "Managed local ingestion and hybrid retrieval for Org-roam"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+  "numpy==2.5.4",
+  "pypdf[crypto]==6.12.0",
+  "openpyxl==3.1.5",
+]
+
+[project.optional-dependencies]
+embedding = [
+  "sentence-transformers==6.1.0",
+  "transformers==5.19.0",
+  "torch==2.14.1",
+  "torchvision==0.29.1",
+  "pillow==12.2.0",
+]
+
+[project.scripts]
+org-roam-retrieval-worker = "org_roam_retrieval.worker:main"
+
+[build-system]
+requires = ["setuptools>=77,<83"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["org_roam_retrieval*"]

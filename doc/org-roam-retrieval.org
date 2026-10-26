@@ -1,0 +1,150 @@
+#+TITLE: Search your Org-roam notes and document library
+
+Org-roam retrieval searches saved notes and configured local documents through
+one managed worker. It combines lexical matches with local embeddings when
+the model is ready. Search results include the source location and an excerpt.
+
+* Configure your library
+
+Load the extension from the Org-roam checkout's =extensions= directory:
+
+#+begin_src emacs-lisp
+(require 'org-roam-retrieval)
+(setopt org-roam-retrieval-roots
+        `(((id . "org-roam") (path . ,org-roam-directory))
+          ((id . "library") (path . "~/Documents/library")))
+        org-roam-retrieval-related-root-ids '("org-roam"))
+(org-roam-retrieval-client-enable)
+#+end_src
+
+Run =M-x org-roam-retrieval-setup= to provision the managed worker environment.
+Ordinary searches never download dependencies or model weights. Model loading
+uses the configured immutable revision already present in the local model
+cache. Check =M-x org-roam-retrieval-status= for readiness and coverage.
+
+The worker reconciles sources after startup. Saving records an invalidation
+and returns without waiting for extraction or embeddings. Documents remain
+ordinary files. Indexing never creates IDs, saves notes, or evaluates source
+blocks. Unsaved changes in other buffers enter the corpus after saving.
+
+* Find a passage or a related note
+
+Run =M-x org-roam-retrieval-search= and enter a query to search all roots.
+Run =M-x org-roam-retrieval-related= to find notes related to your current
+Org node. A selected region takes precedence, followed by a narrowed buffer.
+If there is no authored node ID, the command uses the whole buffer. The
+source text includes unsaved edits without writing them to the corpus index.
+
+Use a prefix argument with =org-roam-retrieval-related= to include document
+roots. Results open in the main editing window. The result pane names the active source scope and roots. Lexical
+matches can appear while the model warms. Semantic results update the same
+pane and preserve the selected result. A closing or cancelled pane rejects
+late responses.
+
+In a result pane:
+
+| Key | Action |
+|-----+--------|
+| =RET= | Open the selected source location |
+| =n= / =p= | Move between results |
+| =i= | Insert the selected link at the remembered source cursor |
+| =g= | Repeat this query and scope |
+| =s= | Show readiness, coverage, and recovery actions |
+| =C-c C-k= | Cancel pending work and keep current results |
+| =q= | Close the pane and cancel its pending request |
+
+Each result shows its title, heading or page information, path, and excerpt.
+Results are retrieval suggestions. Their ranking is not a probability or a
+claim that two passages share a historical relationship.
+
+PDF links use readable =pdf:/path/to/book.pdf::page= targets. Existing
+=roam-source:= links remain supported. PDF navigation reaches the referenced
+page, not coordinates or a highlighted sentence. EPUB links retain the actual
+spine member and authored fragment where available.
+
+* Insert references without losing edits
+
+Press =i= to insert one chosen link at the source cursor position remembered
+when the search began. The marker follows intervening edits. A closed or
+read-only source produces an error instead of a write. The command does not
+save the source buffer.
+
+Run =M-x org-roam-retrieval-insert-list= to append a Related notes section.
+Automatic insertion happens only if the source remains unchanged while the
+search runs. It never opens a result window. If the source changed, insertion
+is skipped and reported in the echo area. Insertion is undoable; a later refresh
+does not append the same list again automatically.
+
+Authored Org nodes use =id:= links. PDFs use readable =pdf:= links with page
+numbers. Other sources use =roam-source:= links retaining ID-less heading
+ancestry, EPUB sections, text lines, or spreadsheet sheet/range metadata. Following a
+spreadsheet result opens the workbook and reports its sheet/range. Navigation
+to a specific spreadsheet cell depends on the viewer and is not provided by
+the built-in Emacs document viewer. PDF page navigation uses PDF Tools or Doc
+View when available. The extension must remain loaded to follow
+=roam-source:= links.
+
+* Check coverage and recover
+
+Run =M-x org-roam-retrieval-status=. The screen distinguishes lexical
+readiness, semantic readiness, model loading, indexed passages, embedded
+passages, queued work, and source failures.
+
+Press =s= to check/provision the managed environment. Press =r= to reconcile
+saved sources. Press =R= to preview a derived-index rebuild and confirm it.
+A rebuild preserves source files and Org-roam's graph. It does not clear the
+embedding cache. A forced Org-roam graph sync does not delete the separate
+retrieval database.
+
+A failed model leaves lexical retrieval available. Existing results remain
+visible when a refresh fails. Read errors and unsupported extraction appear
+in coverage diagnostics; filename-only coverage does not mean a document's
+contents were searched.
+
+Images use OCR text when Tesseract and suitable language data are available.
+PDF pages without extractable text use rendered-page OCR when the renderer
+and OCR tools are available. Coverage records empty pages and OCR failures.
+This provides text retrieval over recognized words. It does not provide
+visual-semantic image embeddings or recognition of image meaning. Sources
+without recognized text retain filename-only coverage. Large OCR jobs update
+lexical results as extraction progresses, before the entire corpus or model
+finishes.
+
+* Existing command names
+
+The extension keeps these entrypoints as thin aliases without loading either
+replaced package:
+
+| Existing command | Integrated command |
+|------------------+--------------------|
+| =org-similarity-sidebuffer= | =org-roam-retrieval-related= |
+| =org-similarity-query= | =org-roam-retrieval-search= |
+| =org-similarity-insert-list= | =org-roam-retrieval-insert-list= |
+| =org-similarity-cancel= | =org-roam-retrieval-cancel= |
+| =vdeft= | =org-roam-retrieval-search= |
+| =vdeft-similar-sidebuffer= | =org-roam-retrieval-related= |
+| =vdeft-insert-similar-list= | =org-roam-retrieval-insert-list= |
+
+Use the canonical Org-roam command names for new keybindings and configuration.
+
+Insert-list searches are quiet: they do not open a result window or move focus.
+They append links when ready, and report a changed/read-only source or a failure
+in the echo area. Background insertion uses a separate hidden session so it does
+not replace an existing library search.
+
+The embedding fraction counts eligible content passages only. Filename-only and
+intentionally excluded sources have separate status counts. Org-generated
+=org-ltximg= previews and known build outputs are excluded without deleting
+source files. Original inline and environment LaTeX remains searchable.
+
+* Command discovery and reading style
+
+The configuration enables =command-completion-default-include-p= for native and
+Counsel =M-x=. Retrieval commands expose context predicates: result actions belong
+to result buffers, list insertion requires editable Org text, and insertion of a
+chosen link requires an editable live source. Search and Status remain global.
+Direct Lisp calls and stale keybindings still receive explicit runtime errors.
+
+Results use =variable-pitch= body text and the active Org document/heading faces.
+Only paths use smaller fixed-pitch metadata. The configured reading width and
+line spacing match Org notes; result line numbers and mouse hover styling are off.

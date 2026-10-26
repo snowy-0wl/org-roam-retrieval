@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- (fix): org-roam-extract-subtree: preserve planning metadata, property drawers, and source database updates.
+
 ## 2.3.1 (2025-06-26)
 
 * (fix): Use correct type specifications to suppress warnings by @okomestudio in https://github.com/org-roam/org-roam/pull/2522

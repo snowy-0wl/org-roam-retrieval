@@ -1,0 +1,138 @@
+{
+  "fixture_kind": "synthetic engineering gate, not user-judged evaluation",
+  "profile": {
+    "model": "google/embeddinggemma-2",
+    "revision": "914f7f89142e33e77833254d9c9b90c3cef7303b",
+    "dimension": 256,
+    "device": "cpu",
+    "policy": "search-query-to-titled-document-v1",
+    "dtype": "float32",
+    "normalization": "unit-after-truncation-v1"
+  },
+  "documents": 11,
+  "queries": 12,
+  "model_load_plus_initial_documents_ms": 6220.578084001318,
+  "uncached_query": {
+    "median_ms": 47.52020799787715,
+    "min_ms": 45.121542003471404,
+    "max_ms": 50.54804199608043,
+    "p95_ms": 50.54804199608043
+  },
+  "warm_cached_query_and_native_scoring": {
+    "median_ms": 0.013124998076818883,
+    "min_ms": 0.012750009773299098,
+    "max_ms": 0.025083005311898887,
+    "p95_ms": 0.01654100196901709
+  },
+  "semantic_recall_at_3": 1.0,
+  "semantic_recall_at_1": 1.0,
+  "lexical_recall_at_3": 0.6666666666666666,
+  "semantic_ndcg_at_3": 1.0,
+  "peak_rss_bytes": 1973534720,
+  "checks": {
+    "finite": true,
+    "dimensions": [
+      11,
+      256
+    ],
+    "max_norm_error": 0.0
+  },
+  "results": [
+    {
+      "query": "space-en",
+      "expected": "space",
+      "semantic_rank": 1,
+      "lexical_rank": null,
+      "top_result": "space",
+      "query_ms": 48.36079200322274
+    },
+    {
+      "query": "bread-en",
+      "expected": "bread",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "bread",
+      "query_ms": 47.64816600072663
+    },
+    {
+      "query": "river-he",
+      "expected": "river",
+      "semantic_rank": 1,
+      "lexical_rank": null,
+      "top_result": "river",
+      "query_ms": 48.69045798841398
+    },
+    {
+      "query": "hebrew-he",
+      "expected": "hebrew",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "hebrew",
+      "query_ms": 47.39224999502767
+    },
+    {
+      "query": "greek-en",
+      "expected": "greek",
+      "semantic_rank": 1,
+      "lexical_rank": null,
+      "top_result": "greek",
+      "query_ms": 46.82320900610648
+    },
+    {
+      "query": "greek-gr",
+      "expected": "greek",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "greek",
+      "query_ms": 45.121542003471404
+    },
+    {
+      "query": "memory-en",
+      "expected": "memory",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "memory",
+      "query_ms": 46.68845800915733
+    },
+    {
+      "query": "bank-river",
+      "expected": "river",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "river",
+      "query_ms": 46.77299999457318
+    },
+    {
+      "query": "bank-finance",
+      "expected": "finance",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "finance",
+      "query_ms": 46.113707998301834
+    },
+    {
+      "query": "memory-human",
+      "expected": "neuro",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "neuro",
+      "query_ms": 48.112207994563505
+    },
+    {
+      "query": "related-space",
+      "expected": "space",
+      "semantic_rank": 1,
+      "lexical_rank": 1,
+      "top_result": "space",
+      "query_ms": 48.64533300860785
+    },
+    {
+      "query": "related-bread-he",
+      "expected": "bread",
+      "semantic_rank": 1,
+      "lexical_rank": null,
+      "top_result": "bread",
+      "query_ms": 50.54804199608043
+    }
+  ]
+}
